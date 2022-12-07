@@ -1,16 +1,17 @@
 use nom::{
     branch::alt,
-    character::complete::{alphanumeric1, anychar, char, multispace0},
+    character::complete::{alphanumeric1, char, multispace0},
     combinator::eof,
-    multi::{many_till, separated_list0},
+    multi::separated_list0,
     InputTakeAtPosition,
     IResult,
 };
+use crate::Error;
 
 /// A parsed representation of the `Signature:` header
 #[derive(Debug, Clone)]
 pub(crate) struct SignatureHeader<'a> {
-    pub key_id: &'a str,
+    pub key_id: Option<&'a str>,
     pub algorithm: &'a str,
     pub headers: Vec<&'a str>,
     pub signature: &'a str,
@@ -18,16 +19,14 @@ pub(crate) struct SignatureHeader<'a> {
 }
 
 impl<'a> SignatureHeader<'a> {
-    pub fn signature_bytes(&self) -> Option<Vec<u8>> {
-        base64::decode(self.signature).ok()
+    pub fn signature_bytes(&self) -> Result<Vec<u8>, Error> {
+        base64::decode(self.signature)
+            .map_err(Error::SignatureBase64)
     }
     
-    pub fn parse(input: &'a str) -> Option<Self> {
-        let (input, fields) = parse_header(input).ok()?;
-        if input != "" {
-            // trailing data
-            return None;
-        }
+    pub fn parse(input: &'a str) -> Result<Self, Error> {
+        let (input, fields) = parse_header(input)
+            .map_err(|e| Error::ParseSignatureHeader(e.to_owned()))?;
 
         let mut key_id = None;
         let mut algorithm = None;
@@ -52,11 +51,11 @@ impl<'a> SignatureHeader<'a> {
                     other.push((key, value)),
             }
         }
-        Some(SignatureHeader {
-            key_id: key_id?,
-            algorithm: algorithm?,
-            headers: headers?,
-            signature: signature?,
+        Ok(SignatureHeader {
+            key_id,
+            algorithm: algorithm.ok_or(Error::MissingField("algorithm"))?,
+            headers: headers.ok_or(Error::MissingField("headers"))?,
+            signature: signature.ok_or(Error::MissingField("signature"))?,
             other,
         })
     }
@@ -106,7 +105,7 @@ mod tests {
                 host date digest content-length",
             signature="Base64(RSA-SHA256(signing string))"
         "#).unwrap();
-        assert_eq!(h.key_id, "rsa-key-1");
+        assert_eq!(h.key_id, Some("rsa-key-1"));
         assert_eq!(h.algorithm, "hs2019");
         assert_eq!(h.headers, vec![
             "(request-target)",

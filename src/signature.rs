@@ -3,7 +3,11 @@ use reqwest::{
     header::HeaderMap,
     Request,
 };
-use crate::{signature_header::SignatureHeader, alg::Algorithm};
+use crate::{
+    alg::Algorithm,
+    Error,
+    signature_header::SignatureHeader,
+};
 
 pub struct Signature<'a> {
     request_target: String,
@@ -25,15 +29,17 @@ impl<'a> From<&'a Request> for Signature<'a> {
 }
 
 impl<'a> Signature<'a> {
-    fn header(&self) -> Option<SignatureHeader> {
+    fn header(&self) -> Result<SignatureHeader, Error> {
         self.headers.get("Signature")
-            .and_then(|s| s.to_str().ok())
+            .ok_or(Error::SignatureHeaderMissing)?
+            .to_str()
+            .map_err(Error::HeaderValue)
             .and_then(SignatureHeader::parse)
     }
 
-    fn signing_string(&self) -> Option<String> {
+    fn signing_string(&self) -> Result<String, Error> {
         let header = self.header()?;
-        Some(header.headers.iter()
+        Ok(header.headers.iter()
              .enumerate()
              .map(|(i, key)| {
                  let key_s = key.to_lowercase();
@@ -63,34 +69,18 @@ impl<'a> Signature<'a> {
     }
 
     pub fn key_id(&self) -> Option<&str> {
-        Some(self.header()?.key_id)
+        self.header().ok()?.key_id
     }
 
-    pub fn verify(&self, public_key: &str) -> bool {
+    pub fn verify(&self, public_key: &str) -> Result<bool, Error> {
         // TODO: verify created, expires
         // TODO: require minimal set of headers
-        let signing_string = if let Some(s) = self.signing_string() {
-            s
-        } else {
-            return false;
-        };
-        // let data = digest(&SHA256, signing_string.as_bytes());
-        let header = if let Some(header) = self.header() {
-            header
-        } else {
-            return false;
-        };
-        let alg = if let Some(alg) = crate::alg::by_name(header.algorithm) {
-            alg
-        } else {
-            return false;
-        };
-        if let Some(signature) = header.signature_bytes() {
-            // alg.verify(public_key.as_bytes(), data.as_ref(), &signature)
-            alg.verify(public_key.as_bytes(), signing_string.as_bytes(), &signature)
-        } else {
-            false
-        }
+        let signing_string = self.signing_string()?;
+        let header = self.header()?;
+        let alg = crate::alg::by_name(header.algorithm)
+            .ok_or(Error::UnknownAlgorithm(header.algorithm.to_string()))?;
+        let signature = header.signature_bytes()?;
+        alg.verify(public_key.as_bytes(), signing_string.as_bytes(), &signature)
     }
 }
 
@@ -112,6 +102,6 @@ mod tests {
         let public_key = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAulcRhqjl6GZG9l+Ye29J\ncOYSTpS+rvGvc4YQtIbd08P2jLaiw4k+Nj90sClLV5fQzNG5fo+S8dR85U6VqyL5\nGpixD6x0kuclyBjuTDxd9gh+voix5MVSFuOXM88X5z8glfkiQd/os7NmWgTM9mXI\nsy7q8ZwhaMmijEK2E53ms06yDAeaO3/uCcUt1+CRUOxCEiRf6nMo9SC3ceFG/uma\n/5ck8QgOcxRvCpfH+q25q7qVxDzeWDAfAXnyGybdxiNfJ/9qrCQ05o5BDI3s6ED0\nuPfZdThhEAM/5k3hozDTXZ5umVA9QsV53Kc73z8w7H1Rb+6acfRca+6kFlRdM3Gd\nMwIDAQAB\n-----END PUBLIC KEY-----\n";
 
         let signature = Signature::from(&request);
-        assert_eq!(signature.verify(&public_key), true);
+        assert_eq!(signature.verify(&public_key).unwrap(), true);
     }
 }
