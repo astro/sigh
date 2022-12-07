@@ -1,8 +1,8 @@
-mod rsa_v1_5_sha256;
+mod rsa_sha256;
 
 pub fn by_name(name: &str) -> Option<impl Algorithm> {
     match name {
-        "rsa-sha256" => Some(rsa_v1_5_sha256::RsaV15Sha256),
+        "rsa-sha256" => Some(rsa_sha256::RsaSha256),
         // TODO: mastodon also seems to support "hs2019"
         _ => None,
     }

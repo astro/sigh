@@ -3,7 +3,6 @@ use reqwest::{
     header::HeaderMap,
     Request,
 };
-use ring::{digest::{digest, SHA256}, rand, signature};
 use crate::{signature_header::SignatureHeader, alg::Algorithm};
 
 pub struct Signature<'a> {
@@ -73,31 +72,23 @@ impl<'a> Signature<'a> {
         let signing_string = if let Some(s) = self.signing_string() {
             s
         } else {
-            dbg!("no signing_string");
             return false;
         };
-        dbg!(&signing_string);
         // let data = digest(&SHA256, signing_string.as_bytes());
         let header = if let Some(header) = self.header() {
             header
         } else {
-            dbg!("no header");
             return false;
         };
-        dbg!(&header);
         let alg = if let Some(alg) = crate::alg::by_name(header.algorithm) {
             alg
         } else {
-            dbg!("no alg");
             return false;
         };
-        dbg!(header.algorithm);
         if let Some(signature) = header.signature_bytes() {
-            dbg!(header.signature.len(), &signature.len());
             // alg.verify(public_key.as_bytes(), data.as_ref(), &signature)
             alg.verify(public_key.as_bytes(), signing_string.as_bytes(), &signature)
         } else {
-            dbg!("no sig");
             false
         }
     }
