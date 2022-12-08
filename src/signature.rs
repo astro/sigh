@@ -5,7 +5,8 @@ use reqwest::{
 use crate::{
     alg::Algorithm,
     Error,
-    signature_header::SignatureHeader,
+    PrivateKey,
+    signature_header::SignatureHeader, Key,
 };
 
 /// Signature state for verifying a request
@@ -89,7 +90,7 @@ impl<'a> Signature<'a> {
         let header = self.header()?;
         let alg = crate::alg::by_name(header.algorithm)
             .ok_or(Error::UnknownAlgorithm(header.algorithm.to_string()))?;
-        let public_key = alg.public_key_from_pem(public_key_pem.as_bytes())?;
+        let public_key = crate::PublicKey::from_pem(public_key_pem.as_bytes())?;
         let signature = header.signature_bytes()?;
         alg.verify(&public_key, signing_string.as_bytes(), &signature)
     }
@@ -98,7 +99,7 @@ impl<'a> Signature<'a> {
 /// Configuration for generating a signature
 pub struct SigningConfig<A: Algorithm> {
     algorithm: A,
-    private_key: A::PrivateKey,
+    private_key: PrivateKey,
     key_id: String,
     signed_headers: &'static [&'static str],
     /// Other fields such as `created`, and `expires`
@@ -107,7 +108,7 @@ pub struct SigningConfig<A: Algorithm> {
 
 impl<A: Algorithm> SigningConfig<A> {
     /// Configure for `algorithm` with `private_key` identified by `key_id`
-    pub fn new(algorithm: A, private_key: A::PrivateKey, key_id: impl Into<String>) -> Self {
+    pub fn new(algorithm: A, private_key: PrivateKey, key_id: impl Into<String>) -> Self {
         SigningConfig {
             algorithm,
             private_key,

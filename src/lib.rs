@@ -9,7 +9,7 @@ mod signature;
 mod signature_header;
 
 /// Key serialization/deserialization
-pub use key::Key;
+pub use key::{Key, PrivateKey, PublicKey};
 pub use signature::{
     Signature,
     SigningConfig,

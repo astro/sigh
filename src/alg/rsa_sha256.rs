@@ -2,7 +2,7 @@ use openssl::sign::{Signer, Verifier};
 use openssl::rsa::{Padding, Rsa};
 use openssl::hash::MessageDigest;
 use crate::{Error, Key};
-use crate::key::rsa::{PrivateKey, PublicKey};
+use crate::{PrivateKey, PublicKey};
 
 /// `rsa-sha256` algorithm
 pub struct RsaSha256;
@@ -18,14 +18,11 @@ impl RsaSha256 {
 }
 
 impl super::Algorithm for RsaSha256 {
-    type PrivateKey = PrivateKey;
-    type PublicKey = PublicKey;
-
     fn name(&self) -> &'static str {
         "rsa-sha256"
     }
 
-    fn sign(&self, private_key: &Self::PrivateKey, data: &[u8]) -> Result<Vec<u8>, Error> {
+    fn sign(&self, private_key: &PrivateKey, data: &[u8]) -> Result<Vec<u8>, Error> {
         let pkey = &private_key.0;
         let mut signer = Signer::new(MessageDigest::sha256(), &pkey)?;
         signer.set_rsa_padding(Padding::PKCS1)?;
@@ -37,7 +34,7 @@ impl super::Algorithm for RsaSha256 {
         Ok(buf)
     }
 
-    fn verify(&self, public_key: &Self::PublicKey, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
+    fn verify(&self, public_key: &PublicKey, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
         let pkey = &public_key.0;
         let mut verifier = Verifier::new(MessageDigest::sha256(), &pkey)?;
         verifier.set_rsa_padding(Padding::PKCS1)?;
