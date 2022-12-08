@@ -11,6 +11,7 @@ use crate::{
 pub struct Signature<'a> {
     request_target: String,
     headers: &'a HeaderMap,
+    header: Option<&'a SignatureHeader<'a>>,
 }
 
 impl<'a> From<&'a Request> for Signature<'a> {
@@ -23,17 +24,24 @@ impl<'a> From<&'a Request> for Signature<'a> {
             .unwrap_or_else(|| String::from(url.clone()));
         let request_target = format!("{} /{}", method, path_query);
         let headers = req.headers();
-        Signature { request_target, headers }
+        Signature {
+            request_target,
+            headers,
+            header: None,
+        }
     }
 }
 
 impl<'a> Signature<'a> {
     fn header(&self) -> Result<SignatureHeader, Error> {
-        self.headers.get("Signature")
-            .ok_or(Error::SignatureHeaderMissing)?
-            .to_str()
-            .map_err(Error::HeaderValue)
-            .and_then(SignatureHeader::parse)
+        match self.header {
+            Some(header) => Ok(header.clone()),
+            None => self.headers.get("Signature")
+                .ok_or(Error::SignatureHeaderMissing)?
+                .to_str()
+                .map_err(Error::HeaderValue)
+                .and_then(SignatureHeader::parse),
+        }
     }
 
     fn signing_string(&self) -> Result<String, Error> {
@@ -115,8 +123,8 @@ impl<A: Algorithm> SigningConfig<A> {
             signature: &"-",
             other: vec![],
         };
-        request.headers_mut().insert("signature", HeaderValue::from_str(&header.to_string()).map_err(Error::SerializeHeader)?);
-        let signature = Signature::from(&*request);
+        let mut signature = Signature::from(&*request);
+        signature.header = Some(&header);
         let signing_string = signature.signing_string()?;
         let value = self.algorithm.sign(&self.private_key, &signing_string.as_bytes())?;
         let value = base64::encode(value);
@@ -129,7 +137,6 @@ impl<A: Algorithm> SigningConfig<A> {
 #[cfg(test)]
 mod tests {
     use reqwest::{header::HeaderValue, Method, Request, Url};
-    use crate::key::GenerateKey;
 
     use super::*;
 
