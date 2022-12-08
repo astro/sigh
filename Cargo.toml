@@ -1,7 +1,9 @@
 [package]
 name = "sigh"
+description = "HTTP signature generation and verification for ActivityPub"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 reqwest = "0.11"

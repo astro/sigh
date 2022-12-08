@@ -4,10 +4,11 @@ use openssl::hash::MessageDigest;
 use crate::{Error, Key};
 use crate::key::rsa::{PrivateKey, PublicKey};
 
+/// `rsa-sha256` algorithm
 pub struct RsaSha256;
 
-
 impl RsaSha256 {
+    /// Generate private and public RSA key
     pub fn generate_keys(&self) -> Result<(PrivateKey, PublicKey), Error> {
         let rsa = Rsa::generate(4096 /* bits */)?;
         let private_key = PrivateKey::from_pem(&rsa.private_key_to_pem()?)?;

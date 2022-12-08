@@ -8,6 +8,7 @@ use crate::{
     signature_header::SignatureHeader,
 };
 
+/// Signature state for verifying a request
 pub struct Signature<'a> {
     request_target: String,
     headers: &'a HeaderMap,
@@ -75,10 +76,12 @@ impl<'a> Signature<'a> {
              }).collect())
     }
 
+    /// Get the keyId of the key used for the signature
     pub fn key_id(&self) -> Option<&str> {
         self.header().ok()?.key_id
     }
 
+    /// Verify a signature, should return `Ok(true)`
     pub fn verify(&self, public_key_pem: &str) -> Result<bool, Error> {
         // TODO: verify created, expires
         // TODO: require minimal set of headers
@@ -92,15 +95,18 @@ impl<'a> Signature<'a> {
     }
 }
 
+/// Configuration for generating a signature
 pub struct SigningConfig<A: Algorithm> {
     algorithm: A,
     private_key: A::PrivateKey,
     key_id: String,
     signed_headers: &'static [&'static str],
+    /// Other fields such as `created`, and `expires`
     pub other: Vec<(String, String)>,
 }
 
 impl<A: Algorithm> SigningConfig<A> {
+    /// Configure for `algorithm` with `private_key` identified by `key_id`
     pub fn new(algorithm: A, private_key: A::PrivateKey, key_id: impl Into<String>) -> Self {
         SigningConfig {
             algorithm,
@@ -115,6 +121,7 @@ impl<A: Algorithm> SigningConfig<A> {
         }
     }
 
+    /// Sign a request
     pub fn sign(&self, request: &mut Request) -> Result<(), Error> {
         let mut header = SignatureHeader {
             key_id: Some(&self.key_id),
