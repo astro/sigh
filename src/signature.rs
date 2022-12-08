@@ -5,7 +5,7 @@ use reqwest::{
 use crate::{
     alg::Algorithm,
     Error,
-    signature_header::SignatureHeader, Key,
+    signature_header::SignatureHeader,
 };
 
 pub struct Signature<'a> {
@@ -97,7 +97,7 @@ pub struct SigningConfig<A: Algorithm> {
     private_key: A::PrivateKey,
     key_id: String,
     signed_headers: &'static [&'static str],
-    others: Vec<(String, String)>,
+    pub other: Vec<(String, String)>,
 }
 
 impl<A: Algorithm> SigningConfig<A> {
@@ -111,7 +111,7 @@ impl<A: Algorithm> SigningConfig<A> {
                 "host", "date",
                 "digest", "content-type"
             ],
-            others: vec![],
+            other: vec![],
         }
     }
 
@@ -121,7 +121,7 @@ impl<A: Algorithm> SigningConfig<A> {
             algorithm: self.algorithm.name(),
             headers: self.signed_headers.iter().cloned().collect(),
             signature: &"-",
-            other: vec![],
+            other: self.other.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
         };
         let mut signature = Signature::from(&*request);
         signature.header = Some(&header);
@@ -137,7 +137,7 @@ impl<A: Algorithm> SigningConfig<A> {
 #[cfg(test)]
 mod tests {
     use reqwest::{header::HeaderValue, Method, Request, Url};
-
+    use crate::key::Key;
     use super::*;
 
     /// Real-world Mastodon 4.0 data

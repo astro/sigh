@@ -1,6 +1,5 @@
 use openssl::sign::{Signer, Verifier};
 use openssl::rsa::{Padding, Rsa};
-use openssl::pkey::{PKey, Private, Public};
 use openssl::hash::MessageDigest;
 use crate::{Error, Key};
 use crate::key::rsa::{PrivateKey, PublicKey};

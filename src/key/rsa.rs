@@ -1,6 +1,6 @@
-use openssl::{pkey::{PKey, Private, Public}, rsa::Rsa};
+use openssl::pkey::{PKey, Private, Public};
 use crate::Error;
-use super::{Key, GenerateKey};
+use super::Key;
 
 #[derive(Debug, Clone)]
 pub struct PublicKey(pub PKey<Public>);

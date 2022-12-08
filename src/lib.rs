@@ -1,6 +1,5 @@
 mod error;
-// mod key;
-mod alg;
+pub mod alg;
 mod key;
 mod signature;
 mod signature_header;
