@@ -19,13 +19,48 @@ pub(crate) struct SignatureHeader<'a> {
 }
 
 impl<'a> SignatureHeader<'a> {
+    pub fn to_string(&self) -> String {
+        let mut result = String::with_capacity(512);
+        let mut i = 0;
+        let mut push = |k: &str, v: &str| {
+            if i > 0 {
+                result.push_str(", ");
+            }
+            i += 1;
+
+            result.push_str(k);
+            result.push('=');
+            if v.contains(' ') {
+                result.push('\"');
+                result.push_str(v);
+                result.push('\"');
+            } else {
+                result.push_str(v);
+            }
+        };
+        if let Some(key_id) = self.key_id {
+            push("keyId", key_id);
+        }
+        push("algorithm", self.algorithm);
+        push("headers", &self.headers.iter()
+             .enumerate()
+             .map(|(i, header)|
+                  format!("{}{}", if i == 0 { "" } else { " " }, header)
+             ).collect::<String>());
+        push("signature", self.signature);
+        for (k, v) in &self.other {
+            push(*k, *v);
+        }
+        result
+    }
+
     pub fn signature_bytes(&self) -> Result<Vec<u8>, Error> {
         base64::decode(self.signature)
             .map_err(Error::SignatureBase64)
     }
-    
+
     pub fn parse(input: &'a str) -> Result<Self, Error> {
-        let (input, fields) = parse_header(input)
+        let (_, fields) = parse_header(input)
             .map_err(|e| Error::ParseSignatureHeader(e.to_owned()))?;
 
         let mut key_id = None;
@@ -72,15 +107,18 @@ fn parse_header(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
             let (input, _) = multispace0(input)?;
             let (input, value) = alt((
                 |input| {
-                    let (input, value): (&str, &str) = alphanumeric1(input)?;
-                    Ok((input, value))
-                },
-                |input| {
                     let (input, _): (&str, _) = char('"')(input)?;
                     let (input, value) = input.split_at_position_complete(
                         |c| c == '"'
                     )?;
                     let (input, _) = char('"')(input)?;
+                    Ok((input, value))
+                },
+                |input| {
+                    let input: &str = input;
+                    let (input, value) = input.split_at_position_complete(
+                        |c| c == ' ' || c == ','
+                    )?;
                     Ok((input, value))
                 },
             ))(input)?;

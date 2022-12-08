@@ -1,12 +1,11 @@
-use nom::AsBytes;
 use reqwest::{
-    header::HeaderMap,
+    header::{HeaderMap, HeaderValue},
     Request,
 };
 use crate::{
     alg::Algorithm,
     Error,
-    signature_header::SignatureHeader,
+    signature_header::SignatureHeader, Key,
 };
 
 pub struct Signature<'a> {
@@ -72,21 +71,66 @@ impl<'a> Signature<'a> {
         self.header().ok()?.key_id
     }
 
-    pub fn verify(&self, public_key: &str) -> Result<bool, Error> {
+    pub fn verify(&self, public_key_pem: &str) -> Result<bool, Error> {
         // TODO: verify created, expires
         // TODO: require minimal set of headers
         let signing_string = self.signing_string()?;
         let header = self.header()?;
         let alg = crate::alg::by_name(header.algorithm)
             .ok_or(Error::UnknownAlgorithm(header.algorithm.to_string()))?;
+        let public_key = alg.public_key_from_pem(public_key_pem.as_bytes())?;
         let signature = header.signature_bytes()?;
-        alg.verify(public_key.as_bytes(), signing_string.as_bytes(), &signature)
+        alg.verify(&public_key, signing_string.as_bytes(), &signature)
+    }
+}
+
+pub struct SigningConfig<A: Algorithm> {
+    algorithm: A,
+    private_key: A::PrivateKey,
+    key_id: String,
+    signed_headers: &'static [&'static str],
+    others: Vec<(String, String)>,
+}
+
+impl<A: Algorithm> SigningConfig<A> {
+    pub fn new(algorithm: A, private_key: A::PrivateKey, key_id: impl Into<String>) -> Self {
+        SigningConfig {
+            algorithm,
+            private_key,
+            key_id: key_id.into(),
+            signed_headers: &[
+                "(request-target)",
+                "host", "date",
+                "digest", "content-type"
+            ],
+            others: vec![],
+        }
+    }
+
+    pub fn sign(&self, request: &mut Request) -> Result<(), Error> {
+        let mut header = SignatureHeader {
+            key_id: Some(&self.key_id),
+            algorithm: self.algorithm.name(),
+            headers: self.signed_headers.iter().cloned().collect(),
+            signature: &"-",
+            other: vec![],
+        };
+        request.headers_mut().insert("signature", HeaderValue::from_str(&header.to_string()).map_err(Error::SerializeHeader)?);
+        let signature = Signature::from(&*request);
+        let signing_string = signature.signing_string()?;
+        let value = self.algorithm.sign(&self.private_key, &signing_string.as_bytes())?;
+        let value = base64::encode(value);
+        header.signature = &value;
+        request.headers_mut().insert("signature", HeaderValue::from_str(&header.to_string()).map_err(Error::SerializeHeader)?);
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use reqwest::{header::HeaderValue, Method, Request, Url};
+    use crate::key::GenerateKey;
+
     use super::*;
 
     /// Real-world Mastodon 4.0 data
@@ -103,5 +147,35 @@ mod tests {
 
         let signature = Signature::from(&request);
         assert_eq!(signature.verify(&public_key).unwrap(), true);
+    }
+
+    #[test]
+    fn sign() {
+        let mut request = Request::new(Method::POST, Url::parse("https://relay.fedi.buzz/test").unwrap());
+        let headers = request.headers_mut();
+        headers.insert("host", HeaderValue::from_static(&"relay.fedi.buzz"));
+        headers.insert("date", HeaderValue::from_static(&"Wed, 07 Dec 2022 17:25:25 GMT"));
+        headers.insert("digest", HeaderValue::from_static(&"SHA-256=Kr9tlIjunJw2X/ceUWcezSYxI+OTxQPxpyCrOS0yvLc="));
+        headers.insert("content-type", HeaderValue::from_static(&"application/activity+json"));
+        let (private_key, _) = crate::alg::RsaSha256.generate_keys().unwrap();
+        SigningConfig::new(crate::alg::RsaSha256, private_key, "key1")
+            .sign(&mut request).unwrap();
+        request.headers().get("signature").unwrap();
+    }
+
+    #[test]
+    fn round_trip() {
+        let mut request = Request::new(Method::POST, Url::parse("https://relay.fedi.buzz/test").unwrap());
+        let headers = request.headers_mut();
+        headers.insert("host", HeaderValue::from_static(&"relay.fedi.buzz"));
+        headers.insert("date", HeaderValue::from_static(&"Wed, 07 Dec 2022 17:25:25 GMT"));
+        headers.insert("digest", HeaderValue::from_static(&"SHA-256=Kr9tlIjunJw2X/ceUWcezSYxI+OTxQPxpyCrOS0yvLc="));
+        headers.insert("content-type", HeaderValue::from_static(&"application/activity+json"));
+        let (private_key, public_key) = crate::alg::RsaSha256.generate_keys().unwrap();
+        SigningConfig::new(crate::alg::RsaSha256, private_key.clone(), "key1")
+            .sign(&mut request).unwrap();
+
+        let signature = Signature::from(&request);
+        assert_eq!(signature.verify(&public_key.to_pem().unwrap()).unwrap(), true);
     }
 }
