@@ -20,11 +20,12 @@ impl<'a> From<&'a Request> for Signature<'a> {
     fn from(req: &'a Request) -> Self {
         let method = req.method().as_str().to_lowercase();
         let url = req.url();
-        let path_query = url.join("/")
-            .ok()
-            .and_then(|root_url| root_url.make_relative(&url))
-            .unwrap_or_else(|| String::from(url.clone()));
-        let request_target = format!("{} /{}", method, path_query);
+        let request_target = match url.query() {
+            None =>
+                format!("{} {}", method, url.path()),
+            Some(query) =>
+                format!("{} {}?{}", method, url.path(), query),
+        };
         let headers = req.headers();
         Signature {
             request_target,
