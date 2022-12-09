@@ -5,8 +5,8 @@ use reqwest::{
 use crate::{
     alg::Algorithm,
     Error,
-    PrivateKey,
-    signature_header::SignatureHeader, Key,
+    PrivateKey, PublicKey,
+    signature_header::SignatureHeader,
 };
 
 /// Signature state for verifying a request
@@ -84,14 +84,13 @@ impl<'a> Signature<'a> {
     }
 
     /// Verify a signature, should return `Ok(true)`
-    pub fn verify(&self, public_key_pem: &str) -> Result<bool, Error> {
+    pub fn verify(&self, public_key: &PublicKey) -> Result<bool, Error> {
         // TODO: verify created, expires
         // TODO: require minimal set of headers
         let signing_string = self.signing_string()?;
         let header = self.header()?;
         let alg = crate::alg::by_name(header.algorithm)
             .ok_or(Error::UnknownAlgorithm(header.algorithm.to_string()))?;
-        let public_key = crate::PublicKey::from_pem(public_key_pem.as_bytes())?;
         let signature = header.signature_bytes()?;
         alg.verify(&public_key, signing_string.as_bytes(), &signature)
     }
@@ -146,7 +145,7 @@ impl<A: Algorithm> SigningConfig<A> {
 #[cfg(test)]
 mod tests {
     use reqwest::{header::HeaderValue, Method, Request, Url};
-    use crate::key::Key;
+    use crate::Key;
     use super::*;
 
     /// Real-world Mastodon 4.0 data
@@ -159,7 +158,7 @@ mod tests {
         headers.insert("digest", HeaderValue::from_static(&"SHA-256=Kr9tlIjunJw2X/ceUWcezSYxI+OTxQPxpyCrOS0yvLc="));
         headers.insert("content-type", HeaderValue::from_static(&"application/activity+json"));
         headers.insert("signature", HeaderValue::from_static(&r#"keyId="https://c3d2.social/actor#main-key",algorithm="rsa-sha256",headers="(request-target) host date digest content-type",signature="jeZwvES9qqa6atwASUXHLSynt3rd8OhoNQvnjqhdYkChxahG0QnQDJQcFkEptyjVgODGOqEkdYuqwsJfCh0CLvLMPS0TBefyzFbTB+BVtIWcCANnCNLWlKup0aRqPoH9reN0NaEIqj8JqhN/Bhh2THJdHWAWexCnLQbiKQ2Dy+lk697wSTQ1H4sh8xd1ZtgCPXaoO3Q6oobuBs/d/hcKuxuPFHvikbtQaQfUQjG5MtDm994HkqpYx/+QMfYPw7lcQVStFZ3BbQgrfs4g83OPo2+uu6Q+KQ5ZxR6oHd9N3nmpZO2f+XBZ3j767kVgTnPrHAiqCGX7I3+M8PqAAWERYg==""#));
-        let public_key = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAulcRhqjl6GZG9l+Ye29J\ncOYSTpS+rvGvc4YQtIbd08P2jLaiw4k+Nj90sClLV5fQzNG5fo+S8dR85U6VqyL5\nGpixD6x0kuclyBjuTDxd9gh+voix5MVSFuOXM88X5z8glfkiQd/os7NmWgTM9mXI\nsy7q8ZwhaMmijEK2E53ms06yDAeaO3/uCcUt1+CRUOxCEiRf6nMo9SC3ceFG/uma\n/5ck8QgOcxRvCpfH+q25q7qVxDzeWDAfAXnyGybdxiNfJ/9qrCQ05o5BDI3s6ED0\nuPfZdThhEAM/5k3hozDTXZ5umVA9QsV53Kc73z8w7H1Rb+6acfRca+6kFlRdM3Gd\nMwIDAQAB\n-----END PUBLIC KEY-----\n";
+        let public_key = PublicKey::from_pem(b"-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAulcRhqjl6GZG9l+Ye29J\ncOYSTpS+rvGvc4YQtIbd08P2jLaiw4k+Nj90sClLV5fQzNG5fo+S8dR85U6VqyL5\nGpixD6x0kuclyBjuTDxd9gh+voix5MVSFuOXM88X5z8glfkiQd/os7NmWgTM9mXI\nsy7q8ZwhaMmijEK2E53ms06yDAeaO3/uCcUt1+CRUOxCEiRf6nMo9SC3ceFG/uma\n/5ck8QgOcxRvCpfH+q25q7qVxDzeWDAfAXnyGybdxiNfJ/9qrCQ05o5BDI3s6ED0\nuPfZdThhEAM/5k3hozDTXZ5umVA9QsV53Kc73z8w7H1Rb+6acfRca+6kFlRdM3Gd\nMwIDAQAB\n-----END PUBLIC KEY-----\n").unwrap();
 
         let signature = Signature::from(&request);
         assert_eq!(signature.verify(&public_key).unwrap(), true);
@@ -198,7 +197,7 @@ mod tests {
             .sign(&mut request).unwrap();
 
         let signature = Signature::from(&request);
-        assert_eq!(signature.verify(&public_key.to_pem().unwrap()).unwrap(), true);
+        assert_eq!(signature.verify(&public_key).unwrap(), true);
     }
 
     #[test]
