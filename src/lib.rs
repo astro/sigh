@@ -23,11 +23,11 @@
 //! ## Sign a HTTP request
 //!
 //! ```
-//! use reqwest::Request;
+//! use http::Request;
 //! use sigh::{Key, PrivateKey, SigningConfig};
 //! use sigh::alg::RsaSha256;
 //!
-//! fn sign_request(request: &mut Request, private_key_pem: &[u8]) -> Result<(), sigh::Error> {
+//! fn sign_request<B>(request: &mut Request<B>, private_key_pem: &[u8]) -> Result<(), sigh::Error> {
 //!     let private_key = PrivateKey::from_pem(private_key_pem)?;
 //!     SigningConfig::new(RsaSha256, private_key, "my-key-id")
 //!         .sign(request)
@@ -37,7 +37,7 @@
 //! ## Verify a HTTP request
 //!
 //! ```
-//! use reqwest::Request;
+//! use http::Request;
 //! use sigh::{Key, PublicKey, Signature};
 //!
 //! fn lookup_public_key_pem(key_id: Option<&str>) -> Option<&[u8]> {
@@ -46,7 +46,7 @@
 //!     None
 //! }
 //!
-//! fn verify_request(request: &Request) -> bool {
+//! fn verify_request<B>(request: &Request<B>) -> bool {
 //!     let signature = Signature::from(request);
 //!     let key_id = signature.key_id();
 //!     let public_key_pem = match lookup_public_key_pem(key_id) {

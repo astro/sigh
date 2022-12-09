@@ -1,4 +1,4 @@
-use reqwest::{
+use http::{
     header::{HeaderMap, HeaderValue},
     Request,
 };
@@ -16,15 +16,15 @@ pub struct Signature<'a> {
     header: Option<&'a SignatureHeader<'a>>,
 }
 
-impl<'a> From<&'a Request> for Signature<'a> {
-    fn from(req: &'a Request) -> Self {
+impl<'a, B> From<&'a Request<B>> for Signature<'a> {
+    fn from(req: &'a Request<B>) -> Self {
         let method = req.method().as_str().to_lowercase();
-        let url = req.url();
-        let request_target = match url.query() {
+        let uri = req.uri();
+        let request_target = match uri.query() {
             None =>
-                format!("{} {}", method, url.path()),
+                format!("{} {}", method, uri.path()),
             Some(query) =>
-                format!("{} {}?{}", method, url.path(), query),
+                format!("{} {}?{}", method, uri.path(), query),
         };
         let headers = req.headers();
         Signature {
@@ -123,7 +123,7 @@ impl<A: Algorithm> SigningConfig<A> {
     }
 
     /// Sign a request
-    pub fn sign(&self, request: &mut Request) -> Result<(), Error> {
+    pub fn sign<B>(&self, request: &mut Request<B>) -> Result<(), Error> {
         let mut header = SignatureHeader {
             key_id: Some(&self.key_id),
             algorithm: self.algorithm.name(),
@@ -144,20 +144,23 @@ impl<A: Algorithm> SigningConfig<A> {
 
 #[cfg(test)]
 mod tests {
-    use reqwest::{header::HeaderValue, Method, Request, Url};
+    use http::Request;
     use crate::Key;
     use super::*;
 
     /// Real-world Mastodon 4.0 data
     #[test]
     fn verify_example_post() {
-        let mut request = Request::new(Method::POST, Url::parse("https://relay.fedi.buzz/test").unwrap());
-        let headers = request.headers_mut();
-        headers.insert("host", HeaderValue::from_static(&"relay.fedi.buzz"));
-        headers.insert("date", HeaderValue::from_static(&"Wed, 07 Dec 2022 17:25:25 GMT"));
-        headers.insert("digest", HeaderValue::from_static(&"SHA-256=Kr9tlIjunJw2X/ceUWcezSYxI+OTxQPxpyCrOS0yvLc="));
-        headers.insert("content-type", HeaderValue::from_static(&"application/activity+json"));
-        headers.insert("signature", HeaderValue::from_static(&r#"keyId="https://c3d2.social/actor#main-key",algorithm="rsa-sha256",headers="(request-target) host date digest content-type",signature="jeZwvES9qqa6atwASUXHLSynt3rd8OhoNQvnjqhdYkChxahG0QnQDJQcFkEptyjVgODGOqEkdYuqwsJfCh0CLvLMPS0TBefyzFbTB+BVtIWcCANnCNLWlKup0aRqPoH9reN0NaEIqj8JqhN/Bhh2THJdHWAWexCnLQbiKQ2Dy+lk697wSTQ1H4sh8xd1ZtgCPXaoO3Q6oobuBs/d/hcKuxuPFHvikbtQaQfUQjG5MtDm994HkqpYx/+QMfYPw7lcQVStFZ3BbQgrfs4g83OPo2+uu6Q+KQ5ZxR6oHd9N3nmpZO2f+XBZ3j767kVgTnPrHAiqCGX7I3+M8PqAAWERYg==""#));
+        let request = Request::builder()
+            .method("POST")
+            .uri("/test")
+            .header("host", "relay.fedi.buzz")
+            .header("date", "Wed, 07 Dec 2022 17:25:25 GMT")
+            .header("digest", "SHA-256=Kr9tlIjunJw2X/ceUWcezSYxI+OTxQPxpyCrOS0yvLc=")
+            .header("content-type", "application/activity+json")
+            .header("signature", r#"keyId="https://c3d2.social/actor#main-key",algorithm="rsa-sha256",headers="(request-target) host date digest content-type",signature="jeZwvES9qqa6atwASUXHLSynt3rd8OhoNQvnjqhdYkChxahG0QnQDJQcFkEptyjVgODGOqEkdYuqwsJfCh0CLvLMPS0TBefyzFbTB+BVtIWcCANnCNLWlKup0aRqPoH9reN0NaEIqj8JqhN/Bhh2THJdHWAWexCnLQbiKQ2Dy+lk697wSTQ1H4sh8xd1ZtgCPXaoO3Q6oobuBs/d/hcKuxuPFHvikbtQaQfUQjG5MtDm994HkqpYx/+QMfYPw7lcQVStFZ3BbQgrfs4g83OPo2+uu6Q+KQ5ZxR6oHd9N3nmpZO2f+XBZ3j767kVgTnPrHAiqCGX7I3+M8PqAAWERYg==""#)
+            .body(())
+            .unwrap();
         let public_key = PublicKey::from_pem(b"-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAulcRhqjl6GZG9l+Ye29J\ncOYSTpS+rvGvc4YQtIbd08P2jLaiw4k+Nj90sClLV5fQzNG5fo+S8dR85U6VqyL5\nGpixD6x0kuclyBjuTDxd9gh+voix5MVSFuOXM88X5z8glfkiQd/os7NmWgTM9mXI\nsy7q8ZwhaMmijEK2E53ms06yDAeaO3/uCcUt1+CRUOxCEiRf6nMo9SC3ceFG/uma\n/5ck8QgOcxRvCpfH+q25q7qVxDzeWDAfAXnyGybdxiNfJ/9qrCQ05o5BDI3s6ED0\nuPfZdThhEAM/5k3hozDTXZ5umVA9QsV53Kc73z8w7H1Rb+6acfRca+6kFlRdM3Gd\nMwIDAQAB\n-----END PUBLIC KEY-----\n").unwrap();
 
         let signature = Signature::from(&request);
@@ -165,11 +168,14 @@ mod tests {
     }
 
     fn test_sign<A: Algorithm>(algorithm: A) {
-        let mut request = Request::new(Method::POST, Url::parse("https://example.com/test").unwrap());
-        let headers = request.headers_mut();
-        headers.insert("host", HeaderValue::from_static(&"example.com"));
-        headers.insert("date", HeaderValue::from_static(&"Wed, 07 Dec 2022 17:25:25 GMT"));
-        headers.insert("content-type", HeaderValue::from_static(&"application/activity+json"));
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/test")
+            .header("host", "example.com")
+            .header("date", "Wed, 07 Dec 2022 17:25:25 GMT")
+            .header("content-type", "application/activity+json")
+            .body(())
+            .unwrap();
         let (private_key, _) = algorithm.generate_keys().unwrap();
         SigningConfig::new(algorithm, private_key, "key1")
             .sign(&mut request).unwrap();
@@ -187,11 +193,14 @@ mod tests {
     }
 
     fn test_round_trip<A: Algorithm>(algorithm: A) {
-        let mut request = Request::new(Method::POST, Url::parse("https://example.com/test").unwrap());
-        let headers = request.headers_mut();
-        headers.insert("host", HeaderValue::from_static(&"example.com"));
-        headers.insert("date", HeaderValue::from_static(&"Wed, 07 Dec 2022 17:25:25 GMT"));
-        headers.insert("content-type", HeaderValue::from_static(&"application/activity+json"));
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/test")
+            .header("host", "example.com")
+            .header("date", "Wed, 07 Dec 2022 17:25:25 GMT")
+            .header("content-type", "application/activity+json")
+            .body(())
+            .unwrap();
         let (private_key, public_key) = algorithm.generate_keys().unwrap();
         SigningConfig::new(algorithm, private_key.clone(), "key1")
             .sign(&mut request).unwrap();

@@ -1,6 +1,6 @@
 use std::string::FromUtf8Error;
 
-use reqwest::header::{ToStrError, InvalidHeaderValue};
+use http::header::{ToStrError, InvalidHeaderValue};
 
 /// General error type
 #[derive(Debug)]
