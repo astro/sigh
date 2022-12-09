@@ -1,6 +1,7 @@
 //! HTTP signature generation and verification for ActivityPub
 
 #![deny(unused, missing_docs)]
+
 mod error;
 /// Signature algorithms
 pub mod alg;

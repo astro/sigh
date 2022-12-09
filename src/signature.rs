@@ -164,33 +164,49 @@ mod tests {
         assert_eq!(signature.verify(&public_key).unwrap(), true);
     }
 
-    #[test]
-    fn sign() {
-        let mut request = Request::new(Method::POST, Url::parse("https://relay.fedi.buzz/test").unwrap());
+    fn test_sign<A: Algorithm>(algorithm: A) {
+        let mut request = Request::new(Method::POST, Url::parse("https://example.com/test").unwrap());
         let headers = request.headers_mut();
-        headers.insert("host", HeaderValue::from_static(&"relay.fedi.buzz"));
+        headers.insert("host", HeaderValue::from_static(&"example.com"));
         headers.insert("date", HeaderValue::from_static(&"Wed, 07 Dec 2022 17:25:25 GMT"));
-        headers.insert("digest", HeaderValue::from_static(&"SHA-256=Kr9tlIjunJw2X/ceUWcezSYxI+OTxQPxpyCrOS0yvLc="));
         headers.insert("content-type", HeaderValue::from_static(&"application/activity+json"));
-        let (private_key, _) = crate::alg::RsaSha256.generate_keys().unwrap();
-        SigningConfig::new(crate::alg::RsaSha256, private_key, "key1")
+        let (private_key, _) = algorithm.generate_keys().unwrap();
+        SigningConfig::new(algorithm, private_key, "key1")
             .sign(&mut request).unwrap();
         request.headers().get("signature").unwrap();
     }
 
     #[test]
-    fn round_trip() {
-        let mut request = Request::new(Method::POST, Url::parse("https://relay.fedi.buzz/test").unwrap());
+    fn sign_rsa_sha256() {
+        test_sign(crate::alg::RsaSha256);
+    }
+
+    #[test]
+    fn sign_hs2019() {
+        test_sign(crate::alg::Hs2019);
+    }
+
+    fn test_round_trip<A: Algorithm>(algorithm: A) {
+        let mut request = Request::new(Method::POST, Url::parse("https://example.com/test").unwrap());
         let headers = request.headers_mut();
-        headers.insert("host", HeaderValue::from_static(&"relay.fedi.buzz"));
+        headers.insert("host", HeaderValue::from_static(&"example.com"));
         headers.insert("date", HeaderValue::from_static(&"Wed, 07 Dec 2022 17:25:25 GMT"));
-        headers.insert("digest", HeaderValue::from_static(&"SHA-256=Kr9tlIjunJw2X/ceUWcezSYxI+OTxQPxpyCrOS0yvLc="));
         headers.insert("content-type", HeaderValue::from_static(&"application/activity+json"));
-        let (private_key, public_key) = crate::alg::RsaSha256.generate_keys().unwrap();
-        SigningConfig::new(crate::alg::RsaSha256, private_key.clone(), "key1")
+        let (private_key, public_key) = algorithm.generate_keys().unwrap();
+        SigningConfig::new(algorithm, private_key.clone(), "key1")
             .sign(&mut request).unwrap();
 
         let signature = Signature::from(&request);
         assert_eq!(signature.verify(&public_key.to_pem().unwrap()).unwrap(), true);
+    }
+
+    #[test]
+    fn round_trip_rsa_sha256() {
+        test_round_trip(crate::alg::RsaSha256);
+    }
+
+    #[test]
+    fn round_trip_hs2019() {
+        test_round_trip(crate::alg::Hs2019);
     }
 }
