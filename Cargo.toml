@@ -1,9 +1,12 @@
 [package]
 name = "sigh"
-description = "HTTP signature generation and verification for ActivityPub"
+description = "HTTP signature generation and verification for ActivityPub, using OpenSSL"
 version = "0.1.0"
 edition = "2021"
+categories = ["crypto", "network-programming"]
+keywords = ["http", "signatures", "activitypub"]
 license = "MIT"
+authors = ["Astro <astro@spaceboyz.net>"]
 
 [dependencies]
 reqwest = "0.11"
