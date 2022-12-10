@@ -1,6 +1,7 @@
 use http::{
     header::{HeaderMap, HeaderValue},
     Request,
+    request::Parts,
 };
 use crate::{
     alg::Algorithm,
@@ -30,6 +31,24 @@ impl<'a, B> From<&'a Request<B>> for Signature<'a> {
         Signature {
             request_target,
             headers,
+            header: None,
+        }
+    }
+}
+
+impl<'a> From<&'a Parts> for Signature<'a> {
+    fn from(parts: &'a Parts) -> Self {
+        let method = parts.method.as_str().to_lowercase();
+        let uri = &parts.uri;
+        let request_target = match uri.query() {
+            None =>
+                format!("{} {}", method, uri.path()),
+            Some(query) =>
+                format!("{} {}?{}", method, uri.path(), query),
+        };
+        Signature {
+            request_target,
+            headers: &parts.headers,
             header: None,
         }
     }
