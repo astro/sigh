@@ -13,12 +13,12 @@ use crate::{
 /// Signature state for verifying a request
 pub struct Signature<'a> {
     request_target: String,
-    headers: &'a HeaderMap,
-    header: Option<&'a SignatureHeader<'a>>,
+    headers: HeaderMap,
+    header: Option<SignatureHeader<'a>>,
 }
 
-impl<'a, B> From<&'a Request<B>> for Signature<'a> {
-    fn from(req: &'a Request<B>) -> Self {
+impl<'a, B> From<&Request<B>> for Signature<'a> {
+    fn from(req: &Request<B>) -> Self {
         let method = req.method().as_str().to_lowercase();
         let uri = req.uri();
         let request_target = match uri.query() {
@@ -30,14 +30,14 @@ impl<'a, B> From<&'a Request<B>> for Signature<'a> {
         let headers = req.headers();
         Signature {
             request_target,
-            headers,
+            headers: headers.clone(),
             header: None,
         }
     }
 }
 
-impl<'a> From<&'a Parts> for Signature<'a> {
-    fn from(parts: &'a Parts) -> Self {
+impl<'a> From<&Parts> for Signature<'a> {
+    fn from(parts: &Parts) -> Self {
         let method = parts.method.as_str().to_lowercase();
         let uri = &parts.uri;
         let request_target = match uri.query() {
@@ -48,7 +48,7 @@ impl<'a> From<&'a Parts> for Signature<'a> {
         };
         Signature {
             request_target,
-            headers: &parts.headers,
+            headers: parts.headers.clone(),
             header: None,
         }
     }
@@ -56,7 +56,7 @@ impl<'a> From<&'a Parts> for Signature<'a> {
 
 impl<'a> Signature<'a> {
     fn header(&self) -> Result<SignatureHeader, Error> {
-        match self.header {
+        match &self.header {
             Some(header) => Ok(header.clone()),
             None => self.headers.get("Signature")
                 .ok_or(Error::SignatureHeaderMissing)?
@@ -143,18 +143,18 @@ impl<A: Algorithm> SigningConfig<A> {
 
     /// Sign a request
     pub fn sign<B>(&self, request: &mut Request<B>) -> Result<(), Error> {
-        let mut header = SignatureHeader {
+        let mut signature = Signature::from(&*request);
+        signature.header = Some(SignatureHeader {
             key_id: Some(&self.key_id),
             algorithm: self.algorithm.name(),
             headers: self.signed_headers.iter().cloned().collect(),
             signature: &"-",
             other: self.other.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
-        };
-        let mut signature = Signature::from(&*request);
-        signature.header = Some(&header);
+        });
         let signing_string = signature.signing_string()?;
         let value = self.algorithm.sign(&self.private_key, &signing_string.as_bytes())?;
         let value = base64::encode(value);
+        let mut header = signature.header.unwrap();
         header.signature = &value;
         request.headers_mut().insert("signature", HeaderValue::from_str(&header.to_string()).map_err(Error::SerializeHeader)?);
         Ok(())
