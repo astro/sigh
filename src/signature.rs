@@ -102,6 +102,11 @@ impl<'a> Signature<'a> {
         self.header().ok()?.key_id
     }
 
+    /// Get the HTTP headers that are used for the signing_string
+    pub fn headers(&self) -> Option<Vec<&str>> {
+        Some(self.header().ok()?.headers)
+    }
+
     /// Verify a signature, should return `Ok(true)`
     pub fn verify(&self, public_key: &PublicKey) -> Result<bool, Error> {
         // TODO: verify created, expires
