@@ -29,7 +29,7 @@
 //!
 //! fn sign_request<B>(request: &mut Request<B>, private_key_pem: &[u8]) -> Result<(), sigh::Error> {
 //!     let private_key = PrivateKey::from_pem(private_key_pem)?;
-//!     SigningConfig::new(RsaSha256, private_key, "my-key-id")
+//!     SigningConfig::new(RsaSha256, &private_key, "my-key-id")
 //!         .sign(request)
 //! }
 //! ```

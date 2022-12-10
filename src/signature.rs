@@ -116,18 +116,18 @@ impl<'a> Signature<'a> {
 }
 
 /// Configuration for generating a signature
-pub struct SigningConfig<A: Algorithm> {
+pub struct SigningConfig<'k, A: Algorithm> {
     algorithm: A,
-    private_key: PrivateKey,
+    private_key: &'k PrivateKey,
     key_id: String,
     signed_headers: &'static [&'static str],
     /// Other fields such as `created`, and `expires`
     pub other: Vec<(String, String)>,
 }
 
-impl<A: Algorithm> SigningConfig<A> {
+impl<'k, A: Algorithm> SigningConfig<'k, A> {
     /// Configure for `algorithm` with `private_key` identified by `key_id`
-    pub fn new(algorithm: A, private_key: PrivateKey, key_id: impl Into<String>) -> Self {
+    pub fn new(algorithm: A, private_key: &'k PrivateKey, key_id: impl Into<String>) -> Self {
         SigningConfig {
             algorithm,
             private_key,
@@ -196,7 +196,7 @@ mod tests {
             .body(())
             .unwrap();
         let (private_key, _) = algorithm.generate_keys().unwrap();
-        SigningConfig::new(algorithm, private_key, "key1")
+        SigningConfig::new(algorithm, &private_key, "key1")
             .sign(&mut request).unwrap();
         request.headers().get("signature").unwrap();
     }
@@ -221,7 +221,7 @@ mod tests {
             .body(())
             .unwrap();
         let (private_key, public_key) = algorithm.generate_keys().unwrap();
-        SigningConfig::new(algorithm, private_key.clone(), "key1")
+        SigningConfig::new(algorithm, &private_key, "key1")
             .sign(&mut request).unwrap();
 
         let signature = Signature::from(&request);
