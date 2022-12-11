@@ -24,19 +24,15 @@ impl<'a> SignatureHeader<'a> {
         let mut i = 0;
         let mut push = |k: &str, v: &str| {
             if i > 0 {
-                result.push_str(", ");
+                result.push_str(",");
             }
             i += 1;
 
             result.push_str(k);
             result.push('=');
-            if v.contains(' ') {
-                result.push('\"');
-                result.push_str(v);
-                result.push('\"');
-            } else {
-                result.push_str(v);
-            }
+            result.push('\"');
+            result.push_str(v);
+            result.push('\"');
         };
         if let Some(key_id) = self.key_id {
             push("keyId", key_id);
