@@ -1,7 +1,7 @@
 [package]
 name = "sigh"
 description = "HTTP signature generation and verification for ActivityPub, using OpenSSL"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 categories = ["crypto", "network-programming"]
 keywords = ["http", "signatures", "activitypub"]
