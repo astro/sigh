@@ -1,12 +1,14 @@
 [package]
 name = "sigh"
 description = "HTTP signature generation and verification for ActivityPub, using OpenSSL"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
-categories = ["crypto", "network-programming"]
+categories = ["cryptography", "network-programming"]
 keywords = ["http", "signatures", "activitypub"]
 license = "MIT"
 authors = ["Astro <astro@spaceboyz.net>"]
+repository = "https://github.com/astro/sigh"
+documentation = "https://docs.rs/sigh"
 
 [dependencies]
 http = "0.2"
