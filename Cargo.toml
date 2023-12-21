@@ -11,8 +11,8 @@ repository = "https://github.com/astro/sigh"
 documentation = "https://docs.rs/sigh"
 
 [dependencies]
-http = "0.2"
+http = "1"
 nom = "7"
 openssl = "0.10"
-base64 = "0.20"
+base64 = "0.21"
 thiserror = "1"
