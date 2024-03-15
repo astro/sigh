@@ -1,3 +1,4 @@
+use base64::prelude::{BASE64_STANDARD, Engine};
 use http::{
     header::{HeaderMap, HeaderValue},
     Request,
@@ -158,7 +159,7 @@ impl<'k, A: Algorithm> SigningConfig<'k, A> {
         });
         let signing_string = signature.signing_string()?;
         let value = self.algorithm.sign(&self.private_key, &signing_string.as_bytes())?;
-        let value = base64::encode(value);
+        let value = BASE64_STANDARD.encode(value);
         let mut header = signature.header.unwrap();
         header.signature = &value;
         request.headers_mut().insert("signature", HeaderValue::from_str(&header.to_string()).map_err(Error::SerializeHeader)?);

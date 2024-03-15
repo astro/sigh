@@ -1,3 +1,4 @@
+use base64::prelude::{BASE64_STANDARD, Engine};
 use nom::{
     branch::alt,
     character::complete::{alphanumeric1, char, multispace0},
@@ -51,7 +52,7 @@ impl<'a> SignatureHeader<'a> {
     }
 
     pub fn signature_bytes(&self) -> Result<Vec<u8>, Error> {
-        base64::decode(self.signature)
+        BASE64_STANDARD.decode(self.signature)
             .map_err(Error::SignatureBase64)
     }
 
